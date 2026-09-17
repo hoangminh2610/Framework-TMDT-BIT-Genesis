@@ -6,38 +6,77 @@ from sklearn.metrics import (
     davies_bouldin_score,
     silhouette_score,
 )
-from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
 
 def generate_mock_rees46_data(n_events=50000, n_users=2000):
-  """Tự động sinh dữ liệu giả lập chuẩn cấu trúc dataset REES46 Kaggle để chạy thử nghiệm."""
+  """Tự động sinh dữ liệu mô phỏng: đúng chuẩn 50.000 sự kiện và 2.000 người dùng ban đầu."""
   np.random.seed(42)
-  users = [f'user_{i}' for i in range(1, n_users + 1)]
+
+  # Xác định tỷ lệ trùng lặp và sự kiện gốc
+  n_duplicates = int(n_events * 0.03)  
+  n_base_events = n_events - n_duplicates  
+
+  n_single = int(n_users * 0.15)
+  n_core = n_users - n_single
+
+  core_users = [f'user_{i}' for i in range(1, n_core + 1)]
+  single_event_users = [f'user_{i}' for i in range(n_core + 1, n_users + 1)]
+
+  # Đảm bảo mỗi single_event_user xuất hiện đúng 1 lần
+  events_for_core = n_base_events - n_single
+  users_pool = list(
+      np.random.choice(core_users, size=events_for_core)
+  ) + list(single_event_users)
+  np.random.shuffle(users_pool)
+
   event_types = ['view', 'cart', 'remove_from_cart', 'purchase']
   p_types = [0.70, 0.18, 0.08, 0.04]
 
   timestamps = pd.date_range(
-      start='2019-10-01', end='2020-02-28', periods=n_events
+      start='2019-10-01', end='2020-02-28', periods=n_base_events
   )
 
   df = pd.DataFrame({
       'event_time': timestamps,
-      'event_type': np.random.choice(event_types, size=n_events, p=p_types),
-      'product_id': np.random.randint(1000, 5000, size=n_events),
-      'category_id': np.random.randint(10, 50, size=n_events),
+      'event_type': np.random.choice(event_types, size=n_base_events, p=p_types),
+      'product_id': np.random.randint(1000, 5000, size=n_base_events),
+      'category_id': np.random.randint(10, 50, size=n_base_events),
       'brand': np.random.choice(
-          ['loreal', 'maybelline', 'innisfree', 'mac', 'unknown'], size=n_events
+          ['loreal', 'maybelline', 'innisfree', 'mac', 'unknown'],
+          size=n_base_events,
       ),
-      'price': np.round(np.random.exponential(scale=25, size=n_events) + 1.5, 2),
-      'user_id': np.random.choice(users, size=n_events),
-      'user_session': [f'sess_{np.random.randint(1, 10000)}' for _ in range(n_events)],
+      'price': np.round(
+          np.random.exponential(scale=25, size=n_base_events) + 1.5, 2
+      ),
+      'user_id': users_pool,
+      'user_session': [
+          f'sess_{np.random.randint(1, 10000)}' for _ in range(n_base_events)
+      ],
   })
+
+  # 1. Tạo các bản ghi trùng lặp 
+  dup_rows = df.iloc[:n_duplicates].copy()
+  df = pd.concat([df, dup_rows], ignore_index=True)
+
+  # 2. Tạo lỗi giá trị price âm và price = 0
+  error_price_idx = np.random.choice(
+      df.index, size=int(n_events * 0.02), replace=False
+  )
+  df.loc[error_price_idx, 'price'] = -1.0
+
+  # 3. Tạo lỗi giá trị user_id = NaN cho 1.5% dữ liệu
+  eligible_null_idx = df[df['user_id'].isin(core_users[:50])].index
+  null_choice = np.random.choice(
+      eligible_null_idx, size=int(n_events * 0.015), replace=False
+  )
+  df.loc[null_choice, 'user_id'] = np.nan
+
   return df
 
 
 def clean_raw_data(df):
-  """Bước 4.4: Lọc dữ liệu thô và loại bỏ người dùng không đủ 2 sự kiện."""
+  """Lọc dữ liệu thô và loại bỏ người dùng không đủ 2 sự kiện."""
   df['event_time'] = pd.to_datetime(df['event_time'])
   df = df[df['price'] > 0]
   df = df.dropna(subset=['user_id'])
@@ -53,7 +92,7 @@ def clean_raw_data(df):
 
 
 def extract_features(df_clean):
-  """Bước 4.5: Trích xuất tập Baseline RFM hiệu chỉnh và Proposed Features."""
+  """Trích xuất tập Baseline RFM hiệu chỉnh và Proposed Features."""
   t_ref = df_clean['event_time'].max()
   penalty_days = 150.0  # Chu kỳ 5 tháng làm mốc phạt cho người chưa mua
 
@@ -105,7 +144,7 @@ def extract_features(df_clean):
 
 
 def prepare_datasets(features_df):
-  """Bước 4.5.C: Áp dụng Log(x + 1) và chuẩn hóa qua StandardScaler."""
+  """Áp dụng Log(x + 1) và chuẩn hóa qua StandardScaler."""
   baseline_cols = ['Recency', 'Frequency', 'Monetary']
   proposed_cols = [
       'Recency',
@@ -204,6 +243,8 @@ def run_benchmark_matrix(x_base, x_prop, k=4, eps=1.4, min_samples=18):
         'Số cụm': len(unique_clusters)
     })
 
+    return pd.DataFrame(results), labels_dict
+
 def get_data_funnel_stats(df_raw):
   """Thống kê chi tiết phễu lọc theo 4 giai đoạn chuẩn hóa."""
   n_users_initial = df_raw['user_id'].nunique()
@@ -217,36 +258,36 @@ def get_data_funnel_stats(df_raw):
       'Tỷ lệ giữ lại (User %)': '100.00%',
   })
 
-  # Giai đoạn 1: Loại bỏ giá trị lỗi (Null user_id hoặc price <= 0)
+  # 1. Loại bỏ giá trị lỗi (Null user_id hoặc price <= 0)
   df_step1 = df_raw.dropna(subset=['user_id']).copy()
   df_step1 = df_step1[df_step1['price'] > 0]
   u1 = df_step1['user_id'].nunique()
   stats.append({
-      'Giai đoạn lọc': '1. Loại bỏ giá trị lỗi (Null/Âm)',
+      'Giai đoạn lọc': 'Loại bỏ giá trị lỗi (Null/Âm)',
       'Số lượng sự kiện': len(df_step1),
       'Số lượng người dùng': u1,
       'Tỷ lệ giữ lại (User %)': f'{(u1 / n_users_initial) * 100:.2f}%',
   })
 
-  # Giai đoạn 2: Khử trùng lặp bản ghi
+  # 2. Khử trùng lặp bản ghi
   df_step2 = df_step1.drop_duplicates(
       subset=['event_time', 'user_id', 'product_id', 'event_type']
   )
   u2 = df_step2['user_id'].nunique()
   stats.append({
-      'Giai đoạn lọc': '2. Khử trùng lặp bản ghi',
+      'Giai đoạn lọc': 'Khử trùng lặp bản ghi',
       'Số lượng sự kiện': len(df_step2),
       'Số lượng người dùng': u2,
       'Tỷ lệ giữ lại (User %)': f'{(u2 / n_users_initial) * 100:.2f}%',
   })
 
-  # Giai đoạn 3: Lọc người dùng (>= 2 tương tác)
+  # 3. Lọc người dùng (>= 2 tương tác)
   user_counts = df_step2['user_id'].value_counts()
   valid_users = user_counts[user_counts >= 2].index
   df_step3 = df_step2[df_step2['user_id'].isin(valid_users)].copy()
   u3 = df_step3['user_id'].nunique()
   stats.append({
-      'Giai đoạn lọc': '3. Lọc người dùng (≥ 2 tương tác)',
+      'Giai đoạn lọc': 'Lọc người dùng (≥ 2 tương tác)',
       'Số lượng sự kiện': len(df_step3),
       'Số lượng người dùng': u3,
       'Tỷ lệ giữ lại (User %)': f'{(u3 / n_users_initial) * 100:.2f}%',
