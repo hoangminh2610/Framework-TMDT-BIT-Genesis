@@ -142,69 +142,68 @@ def prepare_datasets(features_df):
   return x_base, x_prop, baseline_cols, proposed_cols
 
 
-def run_benchmark_matrix(x_base, x_prop, k=4, eps=1.2, min_samples=10):
-  """Thực thi ma trận thực nghiệm 3 cấu hình C0, C1, C2."""
-  results = []
-  labels_dict = {}
+def run_benchmark_matrix(x_base, x_prop, k=4, eps=1.4, min_samples=18):
+    results = []
+    labels_dict = {}
 
-  # Cấu hình 0: Baseline RFM + K-Means
-  km_c0 = KMeans(n_clusters=k, init='k-means++', n_init=20, max_iter=300, random_state=42)
-  labels_c0 = km_c0.fit_predict(x_base)
-  labels_dict['C0'] = labels_c0
-  results.append({
-      'Cấu hình': 'C0 (Baseline RFM)',
-      'Thuật toán': 'K-Means',
-      'Đặc trưng': 'RFM Hiệu chỉnh (3 biến)',
-      'Silhouette (SC)': round(silhouette_score(x_base, labels_c0), 4),
-      'Davies-Bouldin (DBI)': round(davies_bouldin_score(x_base, labels_c0), 4),
-      'Calinski-Harabasz (CHI)': round(calinski_harabasz_score(x_base, labels_c0), 2),
-      'Tỷ lệ nhiễu (Noise %)': '0.0%',
-      'Số cụm': k,
-  })
+    # Cấu hình 0: Baseline RFM + K-Means
+    km_c0 = KMeans(n_clusters=k, init='k-means++', n_init=20, max_iter=300, random_state=42)
+    labels_c0 = km_c0.fit_predict(x_base)
+    labels_dict['C0'] = labels_c0
+    results.append({
+        'Cấu hình': 'C0 (Baseline RFM)',
+        'Thuật toán': 'K-Means',
+        'Đặc trưng': 'RFM Hiệu chỉnh (3 biến)',
+        'Silhouette (SC)': round(float(silhouette_score(x_base, labels_c0)), 4),
+        'Davies-Bouldin (DBI)': round(float(davies_bouldin_score(x_base, labels_c0)), 4),
+        'Calinski-Harabasz (CHI)': round(float(calinski_harabasz_score(x_base, labels_c0)), 2),
+        'Tỷ lệ nhiễu (Noise %)': '0.0%',
+        'Số cụm': k
+    })
 
-  # Cấu hình 1: Proposed Features + K-Means
-  km_c1 = KMeans(n_clusters=k, init='k-means++', n_init=20, max_iter=300, random_state=42)
-  labels_c1 = km_c1.fit_predict(x_prop)
-  labels_dict['C1'] = labels_c1
-  results.append({
-      'Cấu hình': 'C1 (Proposed + K-Means)',
-      'Thuật toán': 'K-Means',
-      'Đặc trưng': 'RFM + Hành vi (9 biến)',
-      'Silhouette (SC)': round(silhouette_score(x_prop, labels_c1), 4),
-      'Davies-Bouldin (DBI)': round(davies_bouldin_score(x_prop, labels_c1), 4),
-      'Calinski-Harabasz (CHI)': round(calinski_harabasz_score(x_prop, labels_c1), 2),
-      'Tỷ lệ nhiễu (Noise %)': '0.0%',
-      'Số cụm': k,
-  })
+    # Cấu hình 1: Proposed Features + K-Means
+    km_c1 = KMeans(n_clusters=k, init='k-means++', n_init=20, max_iter=300, random_state=42)
+    labels_c1 = km_c1.fit_predict(x_prop)
+    labels_dict['C1'] = labels_c1
+    results.append({
+        'Cấu hình': 'C1 (Proposed + K-Means)',
+        'Thuật toán': 'K-Means',
+        'Đặc trưng': 'RFM + Hành vi (9 biến)',
+        'Silhouette (SC)': round(float(silhouette_score(x_prop, labels_c1)), 4),
+        'Davies-Bouldin (DBI)': round(float(davies_bouldin_score(x_prop, labels_c1)), 4),
+        'Calinski-Harabasz (CHI)': round(float(calinski_harabasz_score(x_prop, labels_c1)), 2),
+        'Tỷ lệ nhiễu (Noise %)': '0.0%',
+        'Số cụm': k
+    })
 
-  # Cấu hình 2: Proposed Features + DBSCAN
-  db = DBSCAN(eps=eps, min_samples=min_samples)
-  labels_c2 = db.fit_predict(x_prop)
-  labels_dict['C2'] = labels_c2
+    # Cấu hình 2: Proposed Features + DBSCAN
+    db = DBSCAN(eps=eps, min_samples=min_samples)
+    labels_c2 = db.fit_predict(x_prop)
+    labels_dict['C2'] = labels_c2
 
-  n_noise = (labels_c2 == -1).sum()
-  noise_pct = (n_noise / len(labels_c2)) * 100.0
-  valid_mask = labels_c2 != -1
-  unique_clusters = set(labels_c2[valid_mask])
+    n_noise = int((labels_c2 == -1).sum())
+    noise_pct = (n_noise / len(labels_c2)) * 100.0
+    valid_mask = (labels_c2 != -1)
+    unique_clusters = set(labels_c2[valid_mask])
 
-  if len(unique_clusters) >= 2:
-    sc_c2 = round(silhouette_score(x_prop[valid_mask], labels_c2[valid_mask]), 4)
-    dbi_c2 = round(davies_bouldin_score(x_prop[valid_mask], labels_c2[valid_mask]), 4)
-    chi_c2 = round(calinski_harabasz_score(x_prop[valid_mask], labels_c2[valid_mask]), 2)
-  else:
-    sc_c2, dbi_c2, chi_c2 = None, None, None
+    if len(unique_clusters) >= 2:
+        sc_c2 = round(float(silhouette_score(x_prop[valid_mask], labels_c2[valid_mask])), 4)
+        dbi_c2 = round(float(davies_bouldin_score(x_prop[valid_mask], labels_c2[valid_mask])), 4)
+        chi_c2 = round(float(calinski_harabasz_score(x_prop[valid_mask], labels_c2[valid_mask])), 2)
+    else:
+        sc_c2, dbi_c2, chi_c2 = None, None, None
 
-  results.append({
-      'Cấu hình': 'C2 (Proposed + DBSCAN)',
-      'Thuật toán': 'DBSCAN',
-      'Đặc trưng': 'RFM + Hành vi (9 biến)',
-      'Silhouette (SC)': sc_c2,
-      'Davies-Bouldin (DBI)': dbi_c2,
-      'Calinski-Harabasz (CHI)': chi_c2,
-      'Tỷ lệ nhiễu (Noise %)': f'{noise_pct:.2f}%',
-      'Số cụm': len(unique_clusters),
-  })
-  
+    results.append({
+        'Cấu hình': 'C2 (Proposed + DBSCAN)',
+        'Thuật toán': 'DBSCAN',
+        'Đặc trưng': 'RFM + Hành vi (9 biến)',
+        'Silhouette (SC)': sc_c2,
+        'Davies-Bouldin (DBI)': dbi_c2,
+        'Calinski-Harabasz (CHI)': chi_c2,
+        'Tỷ lệ nhiễu (Noise %)': f"{noise_pct:.2f}%",
+        'Số cụm': len(unique_clusters)
+    })
+
 def get_data_funnel_stats(df_raw):
   """Thống kê chi tiết phễu lọc theo 4 giai đoạn chuẩn hóa."""
   n_users_initial = df_raw['user_id'].nunique()
