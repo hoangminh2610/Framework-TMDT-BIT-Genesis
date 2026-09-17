@@ -60,7 +60,7 @@ if run_button:
 
     with st.spinner("Đang thực thi ETL & Feature Engineering..."):
         if is_mock:
-            df_raw = pl.generate_mock_rees46_data(n_events=50000, n_users=1500)
+            df_raw = pl.generate_mock_rees46_data()
         else:
             df_raw = pd.read_csv(uploaded_file)
             
