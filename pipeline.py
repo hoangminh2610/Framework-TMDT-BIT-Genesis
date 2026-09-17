@@ -204,5 +204,53 @@ def run_benchmark_matrix(x_base, x_prop, k=4, eps=1.2, min_samples=10):
       'Tỷ lệ nhiễu (Noise %)': f'{noise_pct:.2f}%',
       'Số cụm': len(unique_clusters),
   })
+  
+def get_data_funnel_stats(df_raw):
+  """Thống kê chi tiết phễu lọc theo 4 giai đoạn chuẩn hóa."""
+  n_users_initial = df_raw['user_id'].nunique()
+  stats = []
 
-  return pd.DataFrame(results), labels_dict
+  # Giai đoạn 0: Dữ liệu thô ban đầu
+  stats.append({
+      'Giai đoạn lọc': 'Dữ liệu thô ban đầu',
+      'Số lượng sự kiện': len(df_raw),
+      'Số lượng người dùng': n_users_initial,
+      'Tỷ lệ giữ lại (User %)': '100.00%',
+  })
+
+  # Giai đoạn 1: Loại bỏ giá trị lỗi (Null user_id hoặc price <= 0)
+  df_step1 = df_raw.dropna(subset=['user_id']).copy()
+  df_step1 = df_step1[df_step1['price'] > 0]
+  u1 = df_step1['user_id'].nunique()
+  stats.append({
+      'Giai đoạn lọc': '1. Loại bỏ giá trị lỗi (Null/Âm)',
+      'Số lượng sự kiện': len(df_step1),
+      'Số lượng người dùng': u1,
+      'Tỷ lệ giữ lại (User %)': f'{(u1 / n_users_initial) * 100:.2f}%',
+  })
+
+  # Giai đoạn 2: Khử trùng lặp bản ghi
+  df_step2 = df_step1.drop_duplicates(
+      subset=['event_time', 'user_id', 'product_id', 'event_type']
+  )
+  u2 = df_step2['user_id'].nunique()
+  stats.append({
+      'Giai đoạn lọc': '2. Khử trùng lặp bản ghi',
+      'Số lượng sự kiện': len(df_step2),
+      'Số lượng người dùng': u2,
+      'Tỷ lệ giữ lại (User %)': f'{(u2 / n_users_initial) * 100:.2f}%',
+  })
+
+  # Giai đoạn 3: Lọc người dùng (>= 2 tương tác)
+  user_counts = df_step2['user_id'].value_counts()
+  valid_users = user_counts[user_counts >= 2].index
+  df_step3 = df_step2[df_step2['user_id'].isin(valid_users)].copy()
+  u3 = df_step3['user_id'].nunique()
+  stats.append({
+      'Giai đoạn lọc': '3. Lọc người dùng (≥ 2 tương tác)',
+      'Số lượng sự kiện': len(df_step3),
+      'Số lượng người dùng': u3,
+      'Tỷ lệ giữ lại (User %)': f'{(u3 / n_users_initial) * 100:.2f}%',
+  })
+
+  return pd.DataFrame(stats)

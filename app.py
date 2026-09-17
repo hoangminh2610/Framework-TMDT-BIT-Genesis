@@ -87,14 +87,26 @@ if run_button:
     ])
 
     with tab1:
+        st.subheader("Thống kê phễu lọc và tiền xử lý dữ liệu (Data Funnel)")
+        funnel_table = pl.get_data_funnel_stats(df_raw)
+        st.dataframe(funnel_table, use_container_width=True)
+
+        st.divider()
+
         c1, c2, c3 = st.columns(3)
         c1.metric("Sự kiện thô", f"{len(df_raw):,}")
         c2.metric("Sự kiện sau lọc", f"{len(df_clean):,}")
         c3.metric("Khách hàng hợp lệ", f"{len(features_df):,}")
-        
-        event_dist = df_clean['event_type'].value_counts().reset_index()
-        event_dist.columns = ['Loại hành vi', 'Số lượng']
-        fig_bar = px.bar(event_dist, x='Loại hành vi', y='Số lượng', color='Loại hành vi', title="Phễu tương tác")
+
+        event_dist = df_clean["event_type"].value_counts().reset_index()
+        event_dist.columns = ["Loại hành vi", "Số lượng"]
+        fig_bar = px.bar(
+            event_dist,
+            x="Loại hành vi",
+            y="Số lượng",
+            color="Loại hành vi",
+            title="Phễu tương tác",
+      )
         st.plotly_chart(fig_bar, use_container_width=True)
 
     with tab2:
