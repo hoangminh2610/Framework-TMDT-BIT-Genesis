@@ -26,6 +26,6 @@ Chế độ Pandas phù hợp với tệp nhỏ hơn. Với bộ REES46 đầy �
 ## Cách đọc kết quả
 
 - C0 và C1 thay đổi bộ đặc trưng; C1 và C2 thay đổi thuật toán.
-- Các chỉ số C0/C1 được ước lượng trên tối đa 5.000 khách hàng để giảm thời gian tính Silhouette. DBSCAN được đánh giá riêng trên mẫu đã chạy.
+- Với cấu hình C0/C1, các chỉ số benchmark được tính trên mẫu tối đa 5.000 khách hàng hợp lệ; đây là cỡ mẫu để tính chỉ số, không phải tổng số khách trong dữ liệu. DBSCAN dùng giới hạn riêng: tối đa 1.700 khách ở dữ liệu demo (50.000 sự kiện, 2.000 người dùng ban đầu) và tối đa 50.000 khách ở CSV nghiên cứu. Số khách DBSCAN thực chạy không vượt số khách hợp lệ còn lại sau lọc.
 - Nhãn phân khúc và cờ Recency là gợi ý diễn giải, không phải dự báo churn. CLV chưa được tính.
 - PCA là phép chiếu để xem cụm; nó không thay thế các chỉ số benchmark trong không gian đặc trưng.
